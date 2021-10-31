@@ -126,10 +126,11 @@ class syntax_plugin_myschulzevote_vote extends DokuWiki_Syntax_Plugin {
             $form->addHidden('already_voted', true);
         }
 
-        $form->addElement('<table>');
+        $form->addElement('<div id="poll_table" class="bitacoratable">');
+        $form->addElement('<table id="poll_table" class="childgrid">');
         $proposals = $this->_buildProposals($data);
         foreach ($data['candy'] as $n => $candy) {
-            $form->addElement('<tr>');
+            $form->addElement('<tr class="draggable_tr">');
             $form->addElement('<td>');
             $form->addElement($this->_render($candy));
             $form->addElement('</td>');
@@ -149,6 +150,7 @@ class syntax_plugin_myschulzevote_vote extends DokuWiki_Syntax_Plugin {
             $form->addElement('</tr>');
         }
         $form->addElement('</table>');
+        $form->addElement('</div>');
 
         if ($open) {
             $form->addElement('<p>'.$this->getLang('howto').'</p>');
