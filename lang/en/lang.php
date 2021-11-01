@@ -1,5 +1,5 @@
 <?php
-
+$lang['invalid_poll'] = 'Invalid or corrupted poll.';
 $lang['no_remote_user'] = 'Please login to vote.';
 $lang['already_voted']  = 'You’ve already voted.';
 $lang['vote_over']      = 'This vote is over.';

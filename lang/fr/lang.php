@@ -1,5 +1,5 @@
 <?php
-
+$lang['invalid_poll'] = 'Sondage invalide ou corrompu.';
 $lang['no_remote_user'] = 'Veuillez vous connecter pour voter.';
 $lang['already_voted']  = 'Vous avez déjà voté.';
 $lang['vote_over']      = 'Ce vote est terminé.';

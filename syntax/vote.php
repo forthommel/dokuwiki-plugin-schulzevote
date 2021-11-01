@@ -301,6 +301,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
 
     function _export() {
         if (!is_array($this->data)) {
+            msg($this->getLang('invalid_poll'), -1);
             return;
         }
         $filename = $this->_voteFilename();
@@ -312,9 +313,11 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
     function _import() {
         $filename = $this->_voteFilename();
         $data = array();
-        if (file_exists($filename)) {
-            $data = unserialize(file_get_contents($filename));
+        if (!file_exists($filename)) {
+            msg($this->getLang('invalid_poll'), -1);
+            return $data;
         }
+        $data = unserialize(file_get_contents($filename));
         echo ">>> ". $filename;
         //sanitize: $doodle[$fullnmae]['choices'] must be at least an array
         //          This may happen if user deselected all choices
