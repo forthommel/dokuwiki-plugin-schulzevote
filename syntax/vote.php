@@ -34,10 +34,15 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
     function handle($match, $state, $pos, Doku_Handler $handler){
         $lines = explode("\n", $match);
 
-        $opts = array();
-        // Determine date from syntax
-        $opts['date'] = null;
+        $opts = array(
+            'title' => 'vote',
+            'date' => null,
+            'align' => 'left',
+            'admin_users' => array(),
+            'admin_groups' => array()
+        );
 
+        // Determine date from syntax
         if (preg_match('/ \d{4}-\d{2}-\d{2}/', $lines[0], $opts['date'])) {
 
             $opts['date'] = strtotime($opts['date'][0]);
@@ -46,18 +51,20 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             }
         }
 
-        $opts['admin_users'] = array();
         if (preg_match('/ adminUsers=([a-zA-Z0-9,]+)/', $lines[0], $admins)) {
             $opts['admin_users'] = explode(',', $admins[1]);
         }
 
-        $opts['admin_groups'] = array();
         if (preg_match('/ adminGroups=([a-zA-Z0-9,]+)/', $lines[0], $admins)) {
             $opts['admin_groups'] = explode(',', $admins[1]);
         }
 
+        // Determine poll title
+        if (preg_match('/title=([a-zA-Z0-9]+)/', $lines[0], $titles)) {
+            $opts['title'] = $titles[1];
+        }
+
         // Determine align informations
-        $opts['align'] = 'left';
         if (preg_match('/(left|right|center)/',$lines[0], $align)) {
             $opts['align'] = $align[0];
         }
@@ -76,37 +83,49 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
 
         $hlp = plugin_load('helper', 'schulzevote');
         $hlp->createVote($candidates);
+        $this->_export();
 
         return array('candy' => $candidates, 'opts' => $opts);
     }
+
+    public $opts = array();
+    public $candy = array();
+    public $data = array();
 
     function render($mode, Doku_Renderer $renderer, $data) {
 
         if ($mode != 'xhtml') return false;
 
+        $this->opts = $data['opts'];
+        $this->candy = $data['candy'];
+        $this->data = $this->_import();
+
+        $renderer->info['cache'] = false;
+
         if (isset($_POST['already_voted']) && checkSecurityToken()) {
-            $this->_handleunvote($data);
+            $this->_handleunvote();
+            $this->_export();
         }
         if (isset($_POST['vote']) && checkSecurityToken()) {
-            $this->_handlepost($data);
+            $this->_handlepost();
+            $this->_export();
         }
-        $this->_html($renderer, $data);
+        $this->_html($renderer);
     }
 
-    function _html(&$renderer, $data) {
+    function _html(&$renderer) {
 
         global $ID;
 
         // set alignment
-        $align = $data['opts']['align'];
+        $align = $this->opts['align'];
 
         $hlp = plugin_load('helper', 'schulzevote');
 #        dbg($hlp);
 
         // check if the vote is over.
-        $open = ($data['opts']['date'] !== null) && ($data['opts']['date'] > time());
+        $open = ($this->opts['date'] !== null) && ($this->opts['date'] > time());
         if ($open) {
-            $renderer->info['cache'] = false;
             if (!isset($_SERVER['REMOTE_USER'])) {
                 $open = false;
                 $closemsg = $this->getLang('no_remote_user');
@@ -114,13 +133,14 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
                 $open = false;
                 $closemsg = $this->getLang('already_voted');
             }
-            $closemsg .= '<br />'.$this->_winnerMsg($hlp, 'leading');
         } else {
             $closemsg = $this->getLang('vote_over').'<br />'.
                         $this->_winnerMsg($hlp, 'has_won');
         }
 
-        $form = new Doku_Form(array('id'=>'plugin__schulzevote', 'class' => 'plugin_schulzevote_'.$align));
+        $form_id = 'plugin__schulzevote__form__' . cleanID($this->opt['title']);
+
+        $form = new Doku_Form(array('id' => $form_id, 'class' => 'plugin__schulzevote plugin_schulzevote_'.$align));
         $form->startFieldset($this->getLang('cast'));
         if ($open) {
             $form->addHidden('id', $ID);
@@ -130,8 +150,8 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         }
 
         $form->addElement('<table>');
-        $proposals = $this->_buildProposals($data);
-        foreach ($data['candy'] as $n => $candy) {
+        $proposals = $this->_buildProposals();
+        foreach ($this->candy as $n => $candy) {
             $form->addElement('<tr>');
             $form->addElement('<td>');
             $form->addElement($this->_render($candy));
@@ -163,7 +183,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         $form->endFieldset();
 
         // if admin
-        if ($this->_isInSuperUsers($data)) {
+        if ($this->_isInSuperUsers()) {
             $ranks = array();
             foreach($hlp->getRanking() as $rank => $items) {
                 foreach($items as $item) {
@@ -172,8 +192,9 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             }
 
             $form->startFieldset('');
+            $form->addElement('<p>' . $this->_winnerMsg($hlp, 'leading') . '</p>');
             $form->addElement('<table>');
-            foreach ($data['candy'] as $n => $candy) {
+            foreach ($this->candy as $n => $candy) {
                 $form->addElement('<tr>');
                 $form->addElement('<td>');
                 $form->addElement($this->_render($candy));
@@ -197,7 +218,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         return !is_null($winner) ? sprintf($this->getLang($lang), $this->_render($winner)) : '';
     }
 
-    function _handlepost($data) {
+    function _handlepost() {
         $err = false;
         $err_str = "";
         $max_vote = null;
@@ -205,7 +226,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             if ($vote !== '') {
                 $vote = explode(' ', $vote)[0];
                 if (!is_numeric($vote)) {
-                    $err_str .= "<li>" . $this->render_text(sprintf($this->getLang('invalid_vote'), $data['candy'][$n]), 'xhtml') . "</li>";
+                    $err_str .= "<li>" . $this->render_text(sprintf($this->getLang('invalid_vote'), $this->candy[$n]), 'xhtml') . "</li>";
                     $vote = '';
                     $err = true;
                 } else {
@@ -226,14 +247,14 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         }
 
         $hlp = plugin_load('helper', 'schulzevote');
-        if (!$hlp->vote(array_combine($data['candy'], $_POST['vote']))) {
+        if (!$hlp->vote(array_combine($this->candy, $_POST['vote']))) {
             msg($this->getLang('invalidated_vote'), -1);
             return;
         }
         msg($this->getLang('voted'), 1);
     }
 
-    function _handleunvote($data) {
+    function _handleunvote() {
         $hlp = plugin_load('helper', 'schulzevote');
         $hlp->deleteVote();
         msg($this->getLang('unvoted'), 1);
@@ -243,23 +264,23 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         return p_render('xhtml', array_slice(p_get_instructions($str), 2, -2), $notused);
     }
 
-    function _isInSuperUsers($data) {
+    function _isInSuperUsers() {
         global $INFO;
 
-        if (!isset($data['opts']['admin_users']) || !isset($data['opts']['admin_groups']))
+        if (!isset($this->opts['admin_users']) || !isset($this->opts['admin_groups']))
             return false; // ensure backward-compatibility with former polls
-        foreach ($data['opts']['admin_users'] as $su_user)
+        foreach ($this->opts['admin_users'] as $su_user)
             if ($_SERVER['REMOTE_USER'] === $su_user)
                 return true;
-        foreach ($data['opts']['admin_groups'] as $su_group)
+        foreach ($this->opts['admin_groups'] as $su_group)
             foreach ($INFO['userinfo']['grps'] as $user_group)
                 if ($user_group === $su_group)
                     return true;
         return false;
     }
 
-    function _buildProposals($data) {
-        $candy = $data['candy'];
+    function _buildProposals() {
+        $candy = $this->candy;
         $proposals = range(0, sizeof($candy));
         $proposals[0] = '-';
         if (sizeof($candy) > 0) {
@@ -267,6 +288,44 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             $proposals[sizeof($candy)] = sprintf($this->getLang('last_choice'), $proposals[sizeof($candy)]);
         }
         return $proposals;
+    }
+
+    function _voteFilename() {
+        if (!isset($this->opts['title'])) {
+            return 'vote.vote';
+        }
+        $title = $this->opts['title'];
+        $id = hsc(trim($title));
+        return metaFN($id, '.vote');
+    }
+
+    function _export() {
+        if (!is_array($this->data)) {
+            return;
+        }
+        $filename = $this->_voteFilename();
+        uksort($this->data, 'strnatcasecmp');
+        io_savefile($filename, serialize($this->data));
+        return $filename;
+    }
+
+    function _import() {
+        $filename = $this->_voteFilename();
+        $data = array();
+        if (file_exists($filename)) {
+            $data = unserialize(file_get_contents($filename));
+        }
+        echo ">>> ". $filename;
+        //sanitize: $doodle[$fullnmae]['choices'] must be at least an array
+        //          This may happen if user deselected all choices
+        /*foreach($data as $fullname => $userData) {
+            if (!is_array($data["$fullname"]['choices'])) {
+                $data["$fullname"]['choices'] = array();
+            }
+        }*/
+        uksort($data, "strnatcasecmp"); // case insensitive "natural" sort
+        print_r($data);
+        return $data;
     }
 }
 
