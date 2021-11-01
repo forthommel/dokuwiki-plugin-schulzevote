@@ -102,13 +102,15 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
 
         $renderer->info['cache'] = false;
 
-        if (isset($_POST['already_voted']) && checkSecurityToken()) {
-            $this->_handleunvote();
-            $this->_export();
-        }
-        if (isset($_POST['vote']) && checkSecurityToken()) {
-            $this->_handlepost();
-            $this->_export();
+        if (isset($_POST['poll_id']) && $_POST['poll_id'] === $this->opts['title']) {
+            if (isset($_POST['already_voted']) && checkSecurityToken()) {
+                $this->_handleunvote();
+                $this->_export();
+            }
+            if (isset($_POST['vote']) && checkSecurityToken()) {
+                $this->_handlepost();
+                $this->_export();
+            }
         }
         $this->_html($renderer);
     }
@@ -119,6 +121,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
 
         // set alignment
         $align = $this->opts['align'];
+        $this_poll = ($this->opts['title'] === $_POST['poll_id']);
 
         $hlp = plugin_load('helper', 'schulzevote');
 #        dbg($hlp);
@@ -138,11 +141,12 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
                         $this->_winnerMsg($hlp, 'has_won');
         }
 
-        $form_id = 'plugin__schulzevote__form__' . cleanID($this->opt['title']);
+        $form_id = cleanID($this->opts['title']);
 
-        $form = new Doku_Form(array('id' => $form_id, 'class' => 'plugin__schulzevote plugin_schulzevote_'.$align));
+        $form = new Doku_Form(array('id' => $form_id, 'name' => $form_id, 'class' => 'plugin_schulzevote_'.$align));
         $form->addElement('<div id="plugin__schulzevote">');
         $form->startFieldset($this->getLang('cast'));
+        $form->addHidden('poll_id', $form_id);
         if ($open) {
             $form->addHidden('id', $ID);
         }
@@ -161,7 +165,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
                 $form->addElement('<td>');
                 $form->addElement(form_makeListboxField('vote[' . $n . ']',
                                   $proposals,
-                                  isset($_POST['vote']) ? $_POST['vote'][$n] : '',
+                                  ($this_poll && isset($_POST['vote'])) ? $_POST['vote'][$n] : '',
                                   $this->_render($candy),
                                   $n,
                                   $class='block candy'));
@@ -221,6 +225,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
     }
 
     function _handlepost() {
+        // first validate the post
         $err = false;
         $err_str = "";
         $max_vote = null;
@@ -242,6 +247,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             msg(sprintf($this->getLang('error_found'), $err_str), -1);
         if ($err || count(array_filter($_POST['vote'])) === 0) return;
 
+        // then process the vote
         foreach($_POST['vote'] as &$vote) {
             if ($vote === '') {
                 $vote = $max_vote + 1;
@@ -254,12 +260,14 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             return;
         }
         msg($this->getLang('voted'), 1);
+        $this->data = $hlp->votes;
     }
 
     function _handleunvote() {
         $hlp = plugin_load('helper', 'schulzevote');
         $hlp->deleteVote();
         msg($this->getLang('unvoted'), 1);
+        $this->data = $hlp->votes;
     }
 
     function _render($str) {
