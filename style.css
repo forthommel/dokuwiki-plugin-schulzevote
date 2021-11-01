@@ -1,5 +1,5 @@
 
-.plugin__schulzevote {
+#plugin__schulzevote {
     padding: 1em 1em 0 1em;
     margin: .5em;
 }
@@ -15,36 +15,36 @@
     float:right;
 }
 
-.plugin__schulzevote fieldset legend {
+#plugin__schulzevote fieldset legend {
     text-align: left;
 }
 
-.plugin__schulzevote p {
+#plugin__schulzevote p {
     text-align:center;
 }
 
-.plugin__schulzevote table {
+#plugin__schulzevote table {
     font-weight: bold;
     text-align:left;
     width: 100%;
     min-width: 600px;
 }
 
-.plugin__schulzevote table td {
+#plugin__schulzevote table td {
     padding: 0 1.5em;
 }
 
-.plugin__schulzevote .candy span {
+#plugin__schulzevote .candy span {
     display: none;
 }
 
-.plugin__schulzevote label.block input {
+#plugin__schulzevote label.block input {
     float: left;
     width: 50px;
 }
 
-.plugin__schulzevote .votebar {
+#plugin__schulzevote .votebar {
     display: block;
     /*background-color: __background_alt__;*/
-    background-color: #ccffff;
+    background-color: #cc0000;
 }

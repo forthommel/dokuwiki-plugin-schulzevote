@@ -141,6 +141,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
         $form_id = 'plugin__schulzevote__form__' . cleanID($this->opt['title']);
 
         $form = new Doku_Form(array('id' => $form_id, 'class' => 'plugin__schulzevote plugin_schulzevote_'.$align));
+        $form->addElement('<div id="plugin__schulzevote">');
         $form->startFieldset($this->getLang('cast'));
         if ($open) {
             $form->addHidden('id', $ID);
@@ -207,6 +208,7 @@ class syntax_plugin_schulzevote_vote extends DokuWiki_Syntax_Plugin {
             $form->addElement('</table>');
             $form->endFieldset();
         }
+        $form->addElement('</div>');
 
         $renderer->doc .=  $form->getForm();
 
